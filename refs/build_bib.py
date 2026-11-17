@@ -23,6 +23,12 @@ DOIS = {
     "kim2025neural": "10.1109/tii.2025.3597951",
     "stratigakos2021value": "10.1109/powertech46648.2021.9494832",
     "papadopoulos2020peak": "10.3390/en13051183",
+    "murphy1993good": "10.1175/1520-0434(1993)008<0281:wiagfa>2.0.co;2",
+    "hyndman2006another": "10.1016/j.ijforecast.2006.03.001",
+    "gneiting2007scoring": "10.1198/016214506000001437",
+    "pinson2007trading": "10.1109/tpwrs.2007.901117",
+    "miller2020gepiii": "10.1080/23744731.2020.1795514",
+    "vazquez2019citylearn": "10.1145/3360322.3360998",
 }
 EXTRA = r"""
 @misc{depoortere2026dfl,
@@ -39,6 +45,13 @@ EXTRA = r"""
   booktitle = {Advances in Neural Information Processing Systems 36 (Datasets and Benchmarks Track)},
   year = {2023},
   note = {arXiv:2307.00142}
+}
+@inproceedings{donti2017task,
+  author = {Donti, Priya L. and Amos, Brandon and Kolter, J. Zico},
+  title = {Task-based end-to-end model learning in stochastic optimization},
+  booktitle = {Advances in Neural Information Processing Systems 30},
+  year = {2017},
+  note = {arXiv:1703.04529}
 }
 @inproceedings{ke2017lightgbm,
   author = {Ke, Guolin and Meng, Qi and Finley, Thomas and Wang, Taifeng and Chen, Wei and Ma, Weidong and Ye, Qiwei and Liu, Tie-Yan},

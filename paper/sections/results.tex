@@ -1,12 +1,32 @@
 \section{Results}\label{sec:results}
 
-The analyses use \res{nBMused} building-month-tariff cells after the exclusion rule of Section~\ref{sec:model}. Unless stated otherwise, results refer to tariff T1, the demand-charge tariff.
+Unless stated otherwise, results refer to tariff T1 (with the demand charge) and to the corrected simulation v2.
 
-\subsection{Accuracy does not rank forecasters by value (H1)}
+\subsection{The pre-specified test: accuracy does not rank forecasters by value (H1)}
 
-Executed open loop, the ranking of the five forecasters by MAE did not agree with their ranking by captured share. The mean over buildings of the per-building Kendall $\tau$ was $\res{honeMean}$ (median $\res{honeMedian}$; positive in \res{honePos}\% of buildings; $t=\res{honeT}$, $p=\res{honeP}$; sign test $p=\res{honePsign}$), so the primary hypothesis is not supported; if anything, the more accurate forecaster tended to capture slightly less. Ranking by RMSE instead gave $\tau=\res{honermseMean}$ ($p=\res{honermseP}$), and the \res{honenofillN} buildings without filled gaps gave $\tau=\res{honenofillMean}$ ($p=\res{honenofillP}$). With the guarded controller (H1b, secondary) the agreement was positive but weak: $\tau=\res{honebMean}$, positive in \res{honebPos}\% of buildings ($p=\res{honebP}$).
+On the registered simulation (v1), the mean over buildings of the per-building Kendall $\tau$ between MAE and captured share was $\res{voneMean}$ (95\% CI $\res{voneLo}$ to $\res{voneHi}$; positive in \res{vonePos}\% of buildings; sign test $p=\res{vonePsign}$). On the corrected simulation (v2) it was $\res{honeMean}$ (CI $\res{honeLo}$ to $\res{honeHi}$; positive in \res{honePos}\%). The primary hypothesis is not supported, and the confidence intervals exclude agreement stronger than about $|\tau|=0.03$. Ranking by RMSE gave $\tau=\res{honermseMean}$ ($p=\res{honermseP}$); the first and second halves of 2017 gave $\res{halfOneMean}$ and $\res{halfTwoMean}$; and the \res{honenofillN} buildings without gaps longer than three hours gave $\res{honenofillMean}$ ($p=\res{honenofillP}$). With the guarded controller (H1b) the agreement was positive but weak: $\tau=\res{honebMean}$ (CI $\res{honebLo}$ to $\res{honebHi}$; v1: $\res{vonebMean}$).
 
-An exploratory count makes the size of the gap concrete. In a building-month, the forecaster with the lowest MAE was also the one with the largest captured share in \res{mostAccOpen}\% of cases with open-loop execution and \res{mostAccGuard}\% with the guard. If accuracy and value were unrelated the figure would be 20\%; it is lower because the least accurate forecaster was usually the most valuable (Section~\ref{sec:res-errors}).
+The forecaster with the lowest MAE in a building-month was also the one with the largest captured share in \res{mostAccOpen}\% of building-months with open-loop execution and \res{mostAccGuard}\% with the guard. If accuracy and value were independent, the marginal frequencies (F4 most accurate in \res{mostAccFfour}\% of building-months, F5 most valuable in \res{mostValFfiveOpen}\% and \res{mostValFfiveGuard}\%) would give \res{indepOpen}\% and \res{indepGuard}\%. The most accurate forecaster is thus the most valuable about as often as chance alone would make it.
+
+\subsection{Why: the sign of the error}\label{sec:res-errors}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/fig_synthetic.pdf}
+\caption{Annual share of the perfect-information saving for five synthetic forecasts with exactly the MAE of LightGBM in every building-month (medians and interquartile ranges over buildings, demand-charge tariff).}\label{fig:syn}
+\end{figure}
+
+The synthetic forecasts isolate the property of the error that matters (Figure~\ref{fig:syn}). At the same MAE, a uniform over-forecast kept a median share of $\res{shT1Sscale}$ under both controllers, whereas the uniform under-forecast, its mirror image, gave $\res{shT1Sunder}$ open loop and $\res{shT1GSunder}$ with the guard. Independent noise gave $\res{shT1Snoise}$ and $\res{shT1GSnoise}$, correlated noise $\res{shT1Sar1}$ and $\res{shT1GSar1}$, and the late ramp $\res{shT1Sshift}$ and $\res{shT1GSshift}$ (Friedman $p\res{synFriedP}$ for each controller). An error that makes the forecast too low at the hours the battery charges is what costs money; an error that makes it too high only keeps charge in reserve.
+
+The real forecasters show the same pattern. The 0.9-quantile model F5 was the least accurate on average and the only one with a material bias (\res{relbiasF5}\%), and it captured the largest median share under both controllers (open loop $\res{shT1F5}$, guarded $\res{shT1GF5}$). Within buildings, the rank correlation of the annual share with relative bias averaged $\res{wRhoBiasOpen}$ open loop and $\res{wRhoBiasGuard}$ with the guard, against $\res{wRhoMaeOpen}$ and $\res{wRhoMaeGuard}$ with accuracy (negative relative MAE). Removing F5 restores a weak agreement between MAE and value among the four unbiased forecasters ($\tau=\res{fourOpenMean}$, CI $\res{fourOpenLo}$ to $\res{fourOpenHi}$, open loop; $\res{fourGuardMean}$ with the guard), and replacing the MAE by an asymmetric score restores it for all five: $\tau=\res{pinOpenMean}$ (CI $\res{pinOpenLo}$ to $\res{pinOpenHi}$) for the 0.9 pinball loss and $\res{underOpenMean}$ for the mean under-forecast error open loop, and $\res{pinGuardMean}$ and $\res{underGuardMean}$ with the guard. These analyses are exploratory. The pre-registered H2, whether the error of the forecast daily peak magnitude predicts value better than the MAE, was not supported (mean per-building Spearman correlations $\res{htwoRhoPeak}$ and $\res{htwoRhoMae}$, Holm-adjusted $p=\res{holmH2}$): like the MAE, a symmetric error of the peak ignores the sign.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_accuracy_vs_value.pdf}
+\caption{Accuracy and bias against value. Each point is a building and forecaster: relative MAE (left) and relative bias (right) over the test year against the annual share of the perfect-information saving with guarded execution (demand-charge tariff).}\label{fig:acc}
+\end{figure}
+
+Figure~\ref{fig:acc} shows the cross-section: across buildings and forecasters, a lower MAE does not go with a larger share, and the over-forecasting F5 sits above the others at every level of error.
 
 \subsection{The controller matters more than the forecaster (H4)}
 
@@ -16,51 +36,36 @@ An exploratory count makes the size of the gap concrete. In a building-month, th
 \caption{Annual share of the perfect-information saving under the demand-charge tariff, by forecaster (ordered by mean MAE rank, 1 = most accurate) and controller. Points are medians over \res{nKept} buildings, bars interquartile ranges; the dashed line and band are the median and interquartile range of the forecast-free reactive rule. Negative values mean a higher bill than without a battery.}\label{fig:share}
 \end{figure}
 
-Figure~\ref{fig:share} shows the annual captured share by forecaster and controller. Executed open loop, every forecaster had a negative median share, from $\res{shOpenLo}$ to $\res{shOpenHi}$: the battery raised the bill above the no-battery bill in \res{negT1F1}\% (F1), \res{negT1F2}\% (F2), \res{negT1F3}\% (F3), \res{negT1F4}\% (F4) and \res{negT1F5}\% (F5) of buildings. The mechanism is the asymmetry of the demand charge. The schedule charges in the cheap hours before noon to discharge in the expensive afternoon; when the actual load in a charging hour turns out higher than forecast, the charging power is added to it and can set a new monthly peak. A full-power charge at the hour that becomes the month's peak costs $\lambda P$, as much as a perfectly timed full discharge saves, and the energy arbitrage earns far less than that. The reactive rule, which never charges above the month-to-date peak, captured a median share of $\res{shT1reactive}$ and was at least as good as the best open-loop forecaster in \res{hfourShare}\% of buildings (H4, Holm-adjusted $p=\res{holmH4}$).
+Figure~\ref{fig:share} shows the annual captured share by forecaster and controller. Executed open loop, every forecaster had a negative median share, from $\res{shOpenLo}$ to $\res{shOpenHi}$: the battery raised the bill above the no-battery bill in \res{negT1F1}\% (F1), \res{negT1F2}\% (F2), \res{negT1F3}\% (F3), \res{negT1F4}\% (F4) and \res{negT1F5}\% (F5) of buildings. The mechanism lies in the program~\eqref{eq:lp}. Raising the grid draw up to the month-to-date peak costs nothing in its objective, so its optimal schedules charge until the forecast grid draw touches that peak. When the actual load at such an hour is higher than forecast, the charging power is added to it and sets a new monthly peak; a full-power charge at the hour that becomes the peak costs $\lambda P$, as much as a perfectly timed full discharge saves, while a month of energy arbitrage earns several times less (at most about $0.14P$ dollars per weekday here, against $\lambda P=20P$ dollars per month). Open-loop execution of a cost-minimising day-ahead schedule is therefore fragile by construction, and an over-forecast, which leaves headroom below the peak, is its natural protection. The reactive rule, which never charges above its threshold, was at least as good as the best open-loop forecaster in \res{hfourShare}\% of buildings (H4, Holm-adjusted $p=\res{holmH4}$).
 
-The guard removes the asymmetry. With guarded execution, no forecaster raised the annual bill in any building, and the median shares ranged from $\res{shGuardLo}$ to $\res{shGuardHi}$, and the best forecaster of each building beat the reactive rule in \res{hfourbBeatPct}\% of buildings (medians $\res{hfourbBest}$ against $\res{hfourbReactive}$; H4b, $p=\res{hfourbP}$). The reactive rule is a lower bound for a well-tuned forecast-free rule: it charges whenever energy is cheap, including on weekends when no expensive hours follow, and because every day starts at half charge it pays for energy that it never uses. Even so, the step from open loop to the guard changed the median share by more than any choice among the five forecasters did under either controller.
+The guard removes the fragility. With guarded execution the median shares ranged from $\res{shGuardLo}$ to $\res{shGuardHi}$, at most \res{negT1GF5}\% of buildings had a higher bill than without a battery, and each guarded forecaster captured more than the reactive rule (median $\res{shT1reactive}$) in \res{beatReactLo}--\res{beatReactHi}\% of buildings (F4: \res{beatReactF4}\%, F5: \res{beatReactF5}\%); the reactive rule matched the best of the five guarded forecasters in only \res{hfourbShare}\% of buildings (H4b, $p=\res{hfourbP}$). The step from open loop to the guard changed the median share by more than any choice among the five forecasters did under either controller.
 
-\subsection{Which errors matter (H2)}\label{sec:res-errors}
+\subsection{What is at stake in money}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.78\linewidth]{figures/fig_synthetic.pdf}
-\caption{Annual share of the perfect-information saving for three synthetic forecasts with the same MAE as LightGBM in every building-month (medians and interquartile ranges over buildings, demand-charge tariff).}\label{fig:syn}
-\end{figure}
-
-The synthetic forecasts isolate the type of error (Figure~\ref{fig:syn}). At the same MAE as F4, a uniform over-forecast kept a median share of $\res{shT1Sscale}$ with open-loop execution, random noise gave $\res{shT1Snoise}$ and a one-hour delay $\res{shT1Sshift}$ (Friedman $p\res{synFriedP}$). With the guard the three were $\res{shT1GSscale}$, $\res{shT1GSnoise}$ and $\res{shT1GSshift}$ (Friedman $p\res{synFriedPg}$): the guard rescues the noisy and late forecasts, and the over-forecast remains the most valuable. Errors that make the forecast load too low at the hours the battery charges are the expensive ones; errors that make it too high are cheap, because they lead the schedule to keep charge in reserve.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/fig_accuracy_vs_value.pdf}
-\caption{Accuracy and bias against value. Each point is a building and forecaster: relative MAE (left) and relative bias (right) over the test year against the annual share of the perfect-information saving with guarded execution (demand-charge tariff).}\label{fig:acc}
-\end{figure}
-
-The real forecasters show the same pattern (Figure~\ref{fig:acc}). The 0.9-quantile model F5 was the least accurate on average (mean MAE rank \res{rankF5} of 5 across building-months, last in \res{worstF5}\%, against \res{rankF4} for F4) and the only one with a material bias (\res{relbiasF5}\%), and it captured the largest median share under both controllers (open loop $\res{shT1F5}$, guarded $\res{shT1GF5}$). Across buildings and forecasters, the Spearman correlation of the annual share with accuracy (negative relative MAE) was $\res{rhoMaeOpen}$ for open-loop schedules and $\res{rhoMaeGuard}$ with the guard, and with relative bias $\res{rhoBiasOpen}$ and $\res{rhoBiasGuard}$ (exploratory). The pre-registered H2 asked whether the error of the forecast daily peak predicts value better than the MAE; it did not (mean per-building Spearman correlations $\res{htwoRhoPeak}$ and $\res{htwoRhoMae}$, Holm-adjusted $p=\res{holmH2}$). Both are negative under open loop: the peak magnitude, like the average, is the wrong target when the cost of an error depends on its sign.
+The attainable saving is small. With perfect information the battery saved a median \res{pctT1PI}\% of the annual no-battery bill under T1 (\$\res{usdT1PI} per kW of battery power per year; median bill \$\res{billTOne} thousand) and \res{pctT2PI}\% under T2 (\$\res{usdT2PI} per kW-year). Guarded LightGBM saved \res{pctT1GF4}\% (\$\res{usdT1GF4} per kW-year) and guarded F5 \res{pctT1GF5}\% (\$\res{usdT1GF5}), against \res{pctT1reactive}\% (\$\res{usdT1reactive}) for the reactive rule, whereas the saving of open-loop LightGBM was negative: $\res{pctT1F4}$\% of the bill ($\res{usdT1F4}$ \$ per kW-year). Because the margin between a good and a bad schedule is a fraction of a per cent of the bill, errors of a few per cent in the wrong direction are enough to turn a saving into a loss.
 
 \subsection{Without a demand charge, accuracy does not matter (H3)}
 
-Under the time-of-use tariff T2 every forecaster captured the full perfect-information saving: the median annual share was $\res{shT2F1}$ for each of F1--F5 and no building-forecaster pair was below zero. The schedule of a pure arbitrage program depends on the prices, not on the load, as long as the load exceeds the battery's discharge. Kendall's $\tau$ is therefore undefined in most buildings; in the \res{hthreeN} buildings where the shares differed under both tariffs, agreement was higher under T2 than under T1 ($\res{hthreeTauTwo}$ against $\res{hthreeTauOne}$; H3, Holm-adjusted $p=\res{holmH3}$), but the differences it ranks are negligible.
+Under the time-of-use tariff T2 every forecaster captured the full perfect-information saving: the median annual share was $\res{shT2F1}$ for each of F1--F5, and no building-forecaster pair was below zero. A pure arbitrage schedule depends on the prices, not on the load, as long as the load exceeds the battery's discharge. Kendall's $\tau$ is therefore undefined in most buildings; in the \res{hthreeN} buildings where the shares differed under both tariffs, agreement was higher under T2 than under T1 ($\res{hthreeTauTwo}$ against $\res{hthreeTauOne}$; H3, Holm-adjusted $p=\res{holmH3}$), but the differences it ranks are negligible.
 
 \subsection{Robustness}
 
 \begin{table}[t]
 \centering
 \footnotesize
-\caption{Primary test (H1) under alternative batteries and demand charges: mean per-building Kendall $\tau$ between accuracy (negative MAE) and captured share, open-loop execution unless stated, demand-charge tariff. Excluded: building-month-tariff cells removed by the 0.5\% rule.}\label{tab:rob}
+\caption{Primary test (H1) under the pre-listed alternative batteries and demand charges: mean per-building Kendall $\tau$ between accuracy (negative MAE) and captured share, demand-charge tariff, corrected simulation (v2). Excluded: T1 building-months removed by the 0.5\% rule.}\label{tab:rob}
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
-Setting & Mean $\tau$ & $p$ & $\tau>0$ (\%) & Excluded \\
+Setting & Open loop $\tau$ & $p$ & $\tau>0$ (\%) & Guarded $\tau$ & Excluded \\
 \midrule
-Base: $P$ = 10\% of peak, 20 \$/kW & $\res{honeMean}$ & \res{honeP} & \res{honePos} & \res{nBMexcl} \\
-$P$ = 5\% of peak & $\res{robb05Mean}$ & \res{robb05P} & \res{robb05Pos} & \res{robb05Excl} \\
-$P$ = 20\% of peak & $\res{robb20Mean}$ & \res{robb20P} & \res{robb20Pos} & \res{robb20Excl} \\
-Demand charge 10 \$/kW & $\res{robdc10Mean}$ & \res{robdc10P} & \res{robdc10Pos} & \res{robdc10Excl} \\
-Demand charge 30 \$/kW & $\res{robdc30Mean}$ & \res{robdc30P} & \res{robdc30Pos} & \res{robdc30Excl} \\
-Base, guarded execution & $\res{honebMean}$ & \res{honebP} & \res{honebPos} & \res{nBMexcl} \\
+Base: $P$ = 10\% of peak, 20 \$/kW & $\res{honeMean}$ & \res{honeP} & \res{honePos} & $\res{honebMean}$ & \res{exclTOne} \\
+$P$ = 5\% of peak & $\res{robb05Mean}$ & \res{robb05P} & \res{robb05Pos} & $\res{robgb05Mean}$ & \res{robb05Excl} \\
+$P$ = 20\% of peak & $\res{robb20Mean}$ & \res{robb20P} & \res{robb20Pos} & $\res{robgb20Mean}$ & \res{robb20Excl} \\
+Demand charge 10 \$/kW & $\res{robdc10Mean}$ & \res{robdc10P} & \res{robdc10Pos} & $\res{robgdc10Mean}$ & \res{robdc10Excl} \\
+Demand charge 30 \$/kW & $\res{robdc30Mean}$ & \res{robdc30P} & \res{robdc30Pos} & $\res{robgdc30Mean}$ & \res{robdc30Excl} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:rob} repeats the primary test under the pre-listed alternatives. The sign of $\tau$ depends on the battery: slightly positive with a small battery and negative with a large one, which charges harder and so has more to lose from charging into an unforecast peak. In no setting did the mean $\tau$ exceed \res{robMaxAbsTau} in absolute value. Across buildings, the best forecaster's open-loop share was lower in buildings with a high load factor (Spearman $\res{modLF}$) and higher in buildings with more day-to-day variation ($\res{modCV}$).
+Table~\ref{tab:rob} repeats the primary test under the pre-listed alternatives. In no setting did the open-loop mean $\tau$ exceed \res{robMaxAbsTau} in absolute value; its sign depends on the battery, slightly positive with a small battery and negative with a large one, which charges harder and so has more to lose from charging into an unforecast peak. Across buildings, the best forecaster's open-loop share was lower in buildings with a high load factor (Spearman $\res{modLF}$) and higher in buildings with more day-to-day variation ($\res{modCV}$).

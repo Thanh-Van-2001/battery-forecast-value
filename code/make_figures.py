@@ -18,7 +18,8 @@ plt.rcParams.update({"font.size": 9, "font.family": "serif", "axes.spines.top": 
 BLUE, ORANGE, GREEN, PINK, GOLD, GREY = "#2a78d6", "#eb6834", "#1baf7a", "#e87ba4", "#eda100", "#52514e"
 REAL = ["F4", "F3", "F1", "F2", "F5"]  # ordered by median MAE (most accurate first)
 LAB = {"F1": "Naive 24 h", "F2": "Naive 168 h", "F3": "Ridge", "F4": "LightGBM", "F5": "LightGBM q0.9",
-       "S_noise": "Noise", "S_shift": "1-h shift", "S_scale": "Uniform over-forecast"}
+       "S_noise": "Independent\nnoise", "S_shift": "Late ramp", "S_scale": "Uniform\nover-forecast",
+       "S_under": "Uniform\nunder-forecast", "S_ar1": "Correlated\nnoise"}
 
 
 def med_iqr(x):
@@ -50,8 +51,8 @@ fig.savefig(os.path.join(FIG, "fig_share_by_forecaster.pdf"))
 plt.close(fig)
 
 # Figure 2: same-MAE synthetic errors
-fig, ax = plt.subplots(figsize=(4.6, 2.8))
-SYN = ["S_scale", "S_noise", "S_shift"]
+fig, ax = plt.subplots(figsize=(5.8, 2.9))
+SYN = ["S_scale", "S_under", "S_ar1", "S_noise", "S_shift"]
 xs = np.arange(len(SYN))
 for col, c, mk, off, lab in [("share_open", ORANGE, "o", -0.12, "Open-loop schedule"), ("share_guarded", BLUE, "s", 0.12, "Guarded schedule")]:
     st = [med_iqr(P[P.model == m][col]) for m in SYN]
