@@ -9,6 +9,11 @@
 \setlength{\emergencystretch}{2em}
 \input{gen/macros.tex}
 \newcommand{\repoURL}{https://github.com/Thanh-Van-2001/battery-forecast-value}
+\ifdefined\ANON
+\newcommand{\repolink}{a repository whose address is given on the title page (withheld for anonymized review)}
+\else
+\newcommand{\repolink}{\url{\repoURL}}
+\fi
 
 \journal{Applied Energy}
 
@@ -18,12 +23,15 @@
 
 \title{Asymmetric errors, not accuracy, decide what a load forecast is worth for battery peak shaving: a pre-specified study of \res{nKept} buildings}
 
+% main_anon.tex defines \ANON and inputs this file: the anonymized review copy.
+\ifdefined\ANON\else
 \author[tsg]{Thanh Van Nguyen\corref{cor1}}
 \ead{felicenguyen2001@gmail.com}
 \cortext[cor1]{Corresponding author.}
 \affiliation[tsg]{organization={Tsinghua Shenzhen International Graduate School, Tsinghua University},
             city={Shenzhen},
             country={China}}
+\fi
 
 \begin{abstract}
 \input{sections/abstract}

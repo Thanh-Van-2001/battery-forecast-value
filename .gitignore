@@ -11,3 +11,6 @@ paper/*.bbl
 paper/*.spl
 paper/*.fls
 paper/*.fdb_latexmk
+paper/submission/*.aux
+paper/submission/*.log
+paper/submission/*.out
