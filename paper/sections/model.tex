@@ -1,0 +1,31 @@
+\section{Data and decision model}\label{sec:model}
+
+\subsection{Buildings}
+The Building Data Genome 2 data set contains hourly meter readings from \res{bdgBuildings} non-residential buildings at \res{bdgSites} sites in North America and Europe for 2016 and 2017~\cite{miller2020bdg2}. We use its cleaned electricity meters (\res{nMeters} meters), 2016 for fitting and 2017 for testing. A meter is excluded if more than 5\% of its hours are missing in either year (\res{nExclMissing} meters), if it repeats the same reading for 72 hours or more, a sign of a stuck meter (\res{nExclFlat}), if a gap exceeds 24 hours (\res{nExclGap}), or if its mean load is below 10 kWh per hour (\res{nExclMean}). Gaps of up to three hours are interpolated linearly; longer gaps, in \res{nSeasonal} of the \res{nKept} remaining buildings, are filled with the load at the same hour one week earlier. The median building has \res{filledMedPct}\% of its hours filled. The \res{nKept} buildings come from \res{keptSites} sites; the most common uses are education (\res{useE}), office (\res{useO}) and public services (\res{usePs}), and the median building draws \res{meanLoadMed} kW on average. Each building is matched to its site's air temperature.
+
+\subsection{Tariffs and battery}
+Two tariffs are used. Both charge 0.20~\$/kWh between 12:00 and 18:00 on weekdays and 0.10~\$/kWh otherwise. Tariff T1 adds a demand charge of $\lambda=20$~\$/kW on the highest hourly grid draw of each calendar month; tariff T2 has no demand charge. The battery's power rating $P$ is 10\% of the building's 2016 peak load and its capacity $E=2P$ (two hours). Round-trip efficiency is 90\%, split equally between charging and discharging ($\eta=\sqrt{0.9}$), the state of charge is kept between 10\% and 90\% of $E$, and the battery does not export to the grid.
+
+\subsection{Day-ahead schedule}
+At midnight before day $d$, the operator chooses charging and discharging powers $c_t,\delta_t$ for the 24 hours $t$ of the day from a forecast $\hat L_t$ of the load by the linear program
+\begin{align}
+\min_{c,\delta,s,g,z}\ & \sum_{t=1}^{24} p_t g_t + \lambda z \label{eq:lp}\\
+\text{s.t.}\ & s_{t+1}=s_t+\eta c_t-\delta_t/\eta,\quad g_t=\hat L_t+c_t-\delta_t,\quad g_t\ge 0,\quad z\ge g_t, \nonumber\\
+& z\ge \bar G_{m(d)},\quad 0\le c_t,\delta_t\le P,\quad 0.1E\le s_t\le 0.9E,\quad s_1=s_{25}=0.5E, \nonumber
+\end{align}
+where $p_t$ is the energy price, $g_t$ the grid draw and $\bar G_{m(d)}$ the highest realised grid draw so far in the month of day $d$. The term $\lambda z$ thus charges only for raising the month's peak, and under T2 ($\lambda=0$) the program is pure energy arbitrage. The program is solved with HiGHS for every building, day and forecaster.
+
+\subsection{Execution and benchmarks}
+The schedule is executed against the actual load $L_t$ in one of two ways.
+\begin{itemize}
+\item \emph{Open loop}: the scheduled powers are applied as planned, clipped only to keep the state of charge within its limits and to avoid export.
+\item \emph{Guarded} (Amendment~2, Section~\ref{sec:design}): the scheduled powers are applied, but charging is reduced so that the realised grid draw never exceeds the month-to-date realised peak, and when the actual load alone exceeds that peak the battery discharges, as far as its power and charge allow, to hold the grid draw at the peak. Under T2 the guard has nothing to do and the two executions coincide.
+\end{itemize}
+Three benchmarks complete the comparison: no battery; \emph{perfect information}, the same daily program solved with the actual load; and a \emph{reactive rule} that needs no forecast, which under T1 discharges whenever the load exceeds the month-to-date peak and otherwise charges in cheap hours without creating a new peak, and under T2 charges in cheap hours and discharges in expensive ones. Each day's schedule starts and ends at half charge; energy left above that level by open-loop clipping is forfeited, which penalises poor forecasts equally for all forecasters.
+
+\subsection{Decision value}
+The monthly bill of each policy is the energy cost of its grid draw plus, under T1, $\lambda$ times the month's highest hourly grid draw. The decision value of a forecaster in a building-month is the share of the perfect-information saving that it captures,
+\begin{equation}
+\text{share}=\frac{\text{bill(no battery)}-\text{bill(forecaster)}}{\text{bill(no battery)}-\text{bill(perfect information)}},
+\end{equation}
+which is 1 for a forecaster as good as perfect information, 0 for one that saves nothing and negative for one that raises the bill. Building-months in which perfect information saves less than 0.5\% of the no-battery bill are excluded from share-based analyses because the share is unstable there (\res{nBMexcl} of \res{nBM} building-month-tariff cells, \res{nBMexclPct}\%). Annual shares sum the bills over the remaining months.

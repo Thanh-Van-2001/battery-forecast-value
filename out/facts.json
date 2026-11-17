@@ -1,0 +1,15 @@
+{
+ "bdg2_buildings": 1636,
+ "bdg2_sites": 19,
+ "kept_sites": 10,
+ "scale_median_pct": 9.653583935509191,
+ "scale_q25_pct": 6.303911686112956,
+ "scale_q75_pct": 14.327982060562288,
+ "top_uses": {
+  "Education": 175,
+  "Office": 92,
+  "Public services": 74,
+  "Entertainment/public assembly": 45
+ },
+ "mean_load_median": 78.38496362263481
+}

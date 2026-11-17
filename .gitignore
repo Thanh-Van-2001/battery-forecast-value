@@ -3,3 +3,11 @@ logs/
 results/
 __pycache__/
 *.part
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.blg
+paper/*.bbl
+paper/*.spl
+paper/*.fls
+paper/*.fdb_latexmk

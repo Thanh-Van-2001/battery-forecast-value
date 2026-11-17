@@ -1,0 +1,50 @@
+\documentclass[preprint,12pt]{elsarticle}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{}
+\setlength{\emergencystretch}{2em}
+\input{gen/macros.tex}
+\newcommand{\repoURL}{https://github.com/Thanh-Van-2001/battery-forecast-value}
+
+\journal{Applied Energy}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{The most accurate load forecast is rarely the most valuable: a pre-registered study of battery scheduling in \res{nKept} buildings}
+
+\author[tsg]{Thanh Van Nguyen\corref{cor1}}
+\ead{felicenguyen2001@gmail.com}
+\cortext[cor1]{Corresponding author.}
+\affiliation[tsg]{organization={Tsinghua Shenzhen International Graduate School, Tsinghua University},
+            city={Shenzhen},
+            country={China}}
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\begin{keyword}
+Load forecasting \sep Battery energy storage \sep Demand charge \sep Peak shaving \sep Forecast evaluation \sep Decision-focused learning
+\end{keyword}
+
+\end{frontmatter}
+
+\input{sections/intro}
+\input{sections/related}
+\input{sections/model}
+\input{sections/design}
+\input{sections/results}
+\input{sections/discussion}
+\input{sections/conclusion}
+\input{sections/declarations}
+
+\bibliographystyle{elsarticle-num}
+\bibliography{refs}
+
+\end{document}
