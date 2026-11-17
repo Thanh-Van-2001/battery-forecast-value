@@ -36,7 +36,9 @@ for i, m in enumerate(MODELS):
         yd, fd = y.reshape(NB, ndays, 24), f.reshape(NB, ndays, 24)
         pk_hour = yd.argmax(2)
         err_at_peak = np.abs(np.take_along_axis(fd - yd, pk_hour[..., None], 2)[..., 0]).mean(1)
-        acc.append(pd.DataFrame(dict(model=m, month=mo, building=np.arange(NB),
+        under = np.maximum(y - f, 0).mean(1)  # amendment 3 positive controls: under-forecast error, pinball(0.9)
+        pin = np.where(y >= f, 0.9 * (y - f), 0.1 * (f - y)).mean(1)
+        acc.append(pd.DataFrame(dict(model=m, month=mo, building=np.arange(NB), under=under, pinball09=pin,
                                      mae=np.abs(e[:, k]).mean(1), rmse=np.sqrt((e[:, k] ** 2).mean(1)),
                                      mape=np.nanmean(np.abs(e[:, k]) / np.where(y > 0, y, np.nan), 1),
                                      peak_hour_err=err_at_peak,
@@ -60,13 +62,22 @@ def shares(path):
     return S.reset_index(), A.reset_index(), int((~ok).sum()), int(len(ok))
 
 
-def h1(S, tariff, metric="mae", prefix=""):
+def excl_by_tariff(path):
+    B = pd.read_csv(path)
+    P = B.pivot_table(index=["building", "tariff", "month"], columns="policy", values="bill")
+    bad = (P["none"] - P["PI"]) < MIN_GAIN * P["none"]
+    return bad.groupby(level="tariff").sum()
+
+
+def h1(S, tariff, metric="mae", prefix="", models=None, months=None):
     """mean over months of Kendall tau(-metric, captured share) across F1-F5, per building
-    (prefix "G_" = guarded execution of the same forecasts, amendment 2)"""
-    s = S[S.tariff == tariff].melt(id_vars=["building", "tariff", "month"], value_vars=[prefix + r for r in REAL],
+    (prefix "G_" = guarded execution of the same forecasts, amendment 2; models/months = subsets, amendment 3)"""
+    models = models or REAL
+    S = S if months is None else S[S.month.isin(months)]
+    s = S[S.tariff == tariff].melt(id_vars=["building", "tariff", "month"], value_vars=[prefix + r for r in models],
                                    var_name="model", value_name="share")
     s["model"] = s.model.str.replace(prefix, "", regex=False) if prefix else s.model
-    m = s.merge(ACC[ACC.model.isin(REAL)], on=["model", "month", "building"])
+    m = s.merge(ACC[ACC.model.isin(models)], on=["model", "month", "building"])
     taus = m.groupby(["building", "month"]).apply(lambda g: stats.kendalltau(-g[metric], g["share"]).statistic, include_groups=False)
     return taus.groupby(level="building").mean().dropna()
 
@@ -82,17 +93,21 @@ def summary(x):
     x = x[np.isfinite(x)]
     t = stats.ttest_1samp(x, 0)
     sign = stats.binomtest(int((x > 0).sum()), int((x != 0).sum()), 0.5)
+    half = stats.t.ppf(0.975, len(x) - 1) * x.std(ddof=1) / np.sqrt(len(x))
     return dict(n=len(x), mean=float(x.mean()), median=float(np.median(x)), share_pos=float((x > 0).mean()),
-                t=float(t.statistic), p=float(t.pvalue), p_sign=float(sign.pvalue))
+                t=float(t.statistic), p=float(t.pvalue), p_sign=float(sign.pvalue),
+                ci_lo=float(x.mean() - half), ci_hi=float(x.mean() + half))
 
 
 OUT = {}
 for path in sorted(glob.glob(os.path.join(R, "bills_*.csv"))):
     tag = os.path.basename(path)[6:-4]
     S, A, nex, ntot = shares(path)
-    res = {"excluded_building_months": nex, "building_months": ntot}
+    res = {"excluded_building_months": nex, "building_months": ntot,
+           "excluded_by_tariff": {tf: int(v) for tf, v in excl_by_tariff(path).items()}}
     t1, t2 = h1(S, "T1"), h1(S, "T2")
     res["H1_tau_T1"] = summary(t1)
+    res["H1b_guarded_tau_T1"] = summary(h1(S, "T1", prefix="G_"))
     if tag == "base":
         res["H1_tau_T1_rmse"] = summary(h1(S, "T1", "rmse"))
         sf = Z["seasonal_fill"][:NBF] if "seasonal_fill" in Z.files else np.zeros(NBF, bool)
@@ -128,10 +143,21 @@ for path in sorted(glob.glob(os.path.join(R, "bills_*.csv"))):
         res["H4b_guarded"] = dict(share_reactive_ge_best_guarded=float(kg / len(ag)), n=int(len(ag)),
                                   p=float(stats.binomtest(kg, len(ag), 0.5).pvalue),
                                   median_best_guarded=float(bestg.median()), median_reactive=float(ag["reactive"].median()))
-        syng = ag[["G_S_noise", "G_S_shift", "G_S_scale"]]
+        syng = ag[[c for c in ag.columns if c.startswith("G_S_")]]
         res["synthetic_T1_guarded"] = dict(median={c: float(syng[c].median()) for c in syng},
                                            friedman_p=float(stats.friedmanchisquare(*[syng[c] for c in syng]).pvalue))
-        syn = A[A.tariff == "T1"].set_index("building")[["S_noise", "S_shift", "S_scale"]]
+        # amendment 3 (exploratory unless pre-listed)
+        four = ["F1", "F2", "F3", "F4"]
+        res["H1_F1toF4_open"] = summary(h1(S, "T1", models=four))
+        res["H1_F1toF4_guarded"] = summary(h1(S, "T1", prefix="G_", models=four))
+        for met in ("under", "pinball09"):
+            res[f"H1_{met}_open"] = summary(h1(S, "T1", metric=met))
+            res[f"H1_{met}_guarded"] = summary(h1(S, "T1", metric=met, prefix="G_"))
+        months = sorted(S.month.unique())
+        res["H1_first_half"] = summary(h1(S, "T1", months=months[:6]))  # pre-listed split of the test year
+        res["H1_second_half"] = summary(h1(S, "T1", months=months[6:]))
+        res["guarded_beats_reactive"] = {r: float((ag["G_" + r] > ag["reactive"]).mean()) for r in REAL}
+        syn = A[A.tariff == "T1"].set_index("building")[[c for c in A.columns if c.startswith("S_")]]
         res["synthetic_T1"] = dict(median={c: float(syn[c].median()) for c in syn},
                                    friedman_p=float(stats.friedmanchisquare(*[syn[c] for c in syn]).pvalue))
         lf = YT.mean(1) / YT.max(1)

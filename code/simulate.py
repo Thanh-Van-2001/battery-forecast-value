@@ -47,34 +47,36 @@ def build_lp(E, P):
     return Aeq.tocsr(), Aub.tocsr(), bounds
 
 
-def schedule(Lhat, price, peak_so_far, lam, lp, E):
+def schedule(Lhat, price, peak_so_far, lam, lp, E, s0):
+    """day-ahead LP; amendment 3: starts from the carried-over state of charge s0, ends at half charge.
+    Returns charge, discharge, planned peak z and a success flag."""
     Aeq, Aub, bounds = lp
-    beq = np.concatenate([np.zeros(24), Lhat, [0.5 * E, 0.5 * E]])
+    beq = np.concatenate([np.zeros(24), Lhat, [s0, 0.5 * E]])
     c = np.zeros(NV); c[ig:ig + 24] = price; c[iz] = lam
     bnd = list(bounds); bnd[iz] = (peak_so_far, None)  # demand cost lam*(z - peak) up to a constant
     r = linprog(c, A_ub=Aub, b_ub=np.zeros(24), A_eq=Aeq, b_eq=beq, bounds=bnd, method="highs")
     if r.status != 0:
-        return np.zeros(24), np.zeros(24), False
-    return r.x[ic:ic + 24], r.x[idd:idd + 24], True
+        return np.zeros(24), np.zeros(24), peak_so_far, False
+    return r.x[ic:ic + 24], r.x[idd:idd + 24], r.x[iz], True
 
 
-def execute(L, c, d, E):
-    """open loop: scheduled powers, clipped so that SoC stays in bounds and there is no export"""
-    s, g = 0.5 * E, np.empty(24)
+def execute(L, c, d, E, s0):
+    """open loop: scheduled powers, clipped so that SoC stays in bounds and there is no export; returns (g, SoC)"""
+    s, g = s0, np.empty(24)
     for t in range(24):
         ct = min(c[t], max(0.0, (0.9 * E - s) / ETA))
         dt = min(d[t], max(0.0, (s - 0.1 * E) * ETA), L[t] + ct)
         s += ETA * ct - dt / ETA
         g[t] = L[t] + ct - dt
-    return g
+    return g, s
 
 
-def execute_guarded(L, c, d, E, P, peak_so_far, lam):
-    """amendment 2: the day-ahead schedule, but never charge above the month-to-date peak and discharge to hold
-    the realised load at that peak when it is exceeded (demand-charge tariff only)"""
+def execute_guarded(L, c, d, E, P, threshold, lam, s0):
+    """the day-ahead schedule, but never charge above the threshold and discharge to hold the realised grid draw at it.
+    Amendment 3: threshold = max(month-to-date realised peak, the day's planned peak), which fixes the month start."""
     if lam == 0:
-        return execute(L, c, d, E)
-    s, g, pk = 0.5 * E, np.empty(24), peak_so_far
+        return execute(L, c, d, E, s0)
+    s, g, pk = s0, np.empty(24), threshold
     for t in range(24):
         ct = min(c[t], max(0.0, (0.9 * E - s) / ETA))
         dt = min(d[t], max(0.0, (s - 0.1 * E) * ETA), L[t] + ct)
@@ -85,26 +87,33 @@ def execute_guarded(L, c, d, E, P, peak_so_far, lam):
         s += ETA * ct - dt / ETA
         g[t] = L[t] + ct - dt
         pk = max(pk, g[t])
-    return g
+    return g, s
 
 
-def reactive(L, price, peak_so_far, lam, E, P):
-    s, g, pk = 0.5 * E, np.empty(24), peak_so_far
+def reactive(L, hours, threshold, lam, E, P, s0):
+    """forecast-free rule (amendment 3): T1 - shave above max(month-to-date peak, previous month's peak) and charge only
+    on weekday mornings without exceeding that threshold; T2 - charge on weekday mornings, discharge in expensive hours."""
+    s, g, pk = s0, np.empty(24), threshold
     for t in range(24):
-        if lam > 0 and L[t] > pk:  # shave above the month-to-date peak
-            dt = min(P, L[t] - pk, max(0.0, (s - 0.1 * E) * ETA)); ct = 0.0
-        elif lam == 0 and price[t] >= 0.2:  # TOU only: discharge in expensive hours
-            dt = min(P, L[t], max(0.0, (s - 0.1 * E) * ETA)); ct = 0.0
-        elif price[t] < 0.2:  # charge in cheap hours without creating a new peak
-            room = max(0.0, (0.9 * E - s) / ETA)
-            cap = P if lam == 0 else max(0.0, pk - L[t])
-            ct, dt = min(P, room, cap), 0.0
+        h = hours[t]
+        weekday = dow[h] < 5
+        room = max(0.0, (0.9 * E - s) / ETA)
+        avail = max(0.0, (s - 0.1 * E) * ETA)
+        ct = dt = 0.0
+        if lam > 0:
+            if L[t] > pk:
+                dt = min(P, L[t] - pk, avail)
+            elif weekday and hod[h] < 12:
+                ct = min(P, room, max(0.0, pk - L[t]))
         else:
-            ct = dt = 0.0
+            if weekday and PRICE[h] >= 0.2:
+                dt = min(P, L[t], avail)
+            elif weekday and hod[h] < 12:
+                ct = min(P, room)
         s += ETA * ct - dt / ETA
         g[t] = L[t] + ct - dt
         pk = max(pk, g[t])
-    return g
+    return g, s
 
 
 def one(b):
@@ -113,28 +122,38 @@ def one(b):
     E = 2 * P
     lp = build_lp(E, P)
     rows = []
+    first_m = month[TE[0]]
     for lam, tariff in ((DC, "T1"), (0.0, "T2")):
         names = ["none", "PI", "reactive"] + MODELS + ["G_" + m for m in MODELS]
         G = {n: np.empty(len(TE)) for n in names}
         peaks = {n: 0.0 for n in names}
+        soc = {n: 0.5 * E for n in names}
+        prev_peak_reactive = float(L[month == first_m - 1].max())  # December 2016 peak (no battery)
         fails = 0
         cur_m = None
         for k0 in range(0, len(TE), 24):
             h = TE[k0:k0 + 24]
             m = month[h[0]]
             if m != cur_m:
+                if cur_m is not None:
+                    prev_peak_reactive = peaks["reactive"]
                 peaks = {n: 0.0 for n in names}; cur_m = m
             Ld, pr = L[h], PRICE[h]
             G["none"][k0:k0 + 24] = Ld
-            c, d, ok = schedule(Ld, pr, peaks["PI"], lam, lp, E); fails += not ok
-            G["PI"][k0:k0 + 24] = execute(Ld, c, d, E)
-            G["reactive"][k0:k0 + 24] = reactive(Ld, pr, peaks["reactive"], lam, E, P)
+            c, d, z, ok = schedule(Ld, pr, peaks["PI"], lam, lp, E, soc["PI"]); fails += not ok
+            G["PI"][k0:k0 + 24], soc["PI"] = execute(Ld, c, d, E, soc["PI"])
+            thr = max(peaks["reactive"], prev_peak_reactive) if lam > 0 else 0.0
+            G["reactive"][k0:k0 + 24], soc["reactive"] = reactive(Ld, h, thr, lam, E, P, soc["reactive"])
             for i, mname in enumerate(MODELS):
-                c, d, ok = schedule(F[i, b, k0:k0 + 24], pr, peaks[mname], lam, lp, E); fails += not ok
-                G[mname][k0:k0 + 24] = execute(Ld, c, d, E)
-                if lam > 0:  # guarded execution re-plans with its own month-to-date peak
-                    c, d, ok = schedule(F[i, b, k0:k0 + 24], pr, peaks["G_" + mname], lam, lp, E); fails += not ok
-                G["G_" + mname][k0:k0 + 24] = execute_guarded(Ld, c, d, E, P, peaks["G_" + mname], lam)
+                c, d, z, ok = schedule(F[i, b, k0:k0 + 24], pr, peaks[mname], lam, lp, E, soc[mname]); fails += not ok
+                G[mname][k0:k0 + 24], soc[mname] = execute(Ld, c, d, E, soc[mname])
+                gn = "G_" + mname
+                if lam > 0:  # guarded execution plans from its own state and month-to-date peak
+                    c, d, z, ok = schedule(F[i, b, k0:k0 + 24], pr, peaks[gn], lam, lp, E, soc[gn]); fails += not ok
+                    thr = max(peaks[gn], z)
+                else:
+                    thr = 0.0
+                G[gn][k0:k0 + 24], soc[gn] = execute_guarded(Ld, c, d, E, P, thr, lam, soc[gn])
             for n in names:
                 peaks[n] = max(peaks[n], G[n][k0:k0 + 24].max())
         mt = month[TE]

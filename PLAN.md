@@ -44,5 +44,16 @@ Disclosure: the pipeline was first run on the first 6 eligible buildings to chec
 - **Gap rule.** The 3-hour rule kept only 188 of 1,578 meters (543 excluded for one longer gap), far below the intended population. Gaps of 4-24 hours are now filled with the load at the same hour one week earlier (or later); meters with a gap above 24 hours, or more than 5% missing hours in a year, are still excluded. The pre-listed robustness check without such buildings is reported.
 - **Guarded execution (secondary).** Open-loop execution ignores the realised load, which no operator does. A second controller uses the same day-ahead schedule but never charges above the month-to-date realised peak and discharges to hold the realised load at that peak when it is exceeded. H1 and H4 are repeated for it (H1b, H4b) and the synthetic error types are compared under it. These are secondary analyses, labelled as added after the pipeline check.
 
+## Date correction
+Amendments 1 and 2 are headed 2026-11-18 above; they were committed on 2026-11-17 at 23:45 and 23:53 (+07:00). The commit timestamps are authoritative.
+
+## Amendment 3 (2026-11-18, after the full results and an independent review)
+Disclosure: written after all v1 results (archived in `out/v1/`, code commit in `out/v1/CODE_COMMIT`) and a referee-style review were seen. The registered tests on v1 stay the primary results. A corrected simulation (v2) is reported alongside them:
+- **Bug fix.** The guarded controller and the reactive rule reset the month-to-date peak to zero at each month start, which emptied the battery at 00:00 of day 1. The guard threshold is now max(month-to-date realised peak, the day's planned peak z); the reactive threshold is max(month-to-date realised peak, the previous month's realised peak).
+- **State of charge carried over.** Each day starts from the state of charge left by the previous day (all policies); the day's schedule still ends at half charge. This removes both the forfeited and the free energy of the daily reset.
+- **Reactive rule.** Charges only on weekday mornings (T1: never above its threshold); under T2 discharges only in weekday expensive hours.
+- **Synthetic errors.** Two more same-MAE forecasts: a uniform under-forecast (mirror of the over-forecast) and hourly AR(1) noise (rho = 0.9). The multiplier of the one-hour lag error is reported.
+- **Exploratory additions.** H1 among F1-F4 only; H1 with two asymmetric metrics (mean under-forecast error, 0.9 pinball loss); the pre-listed half-year split; the probability that the most accurate forecaster is the most valuable compared with its independence baseline (ties counted); within-building rank correlations; savings in % of the bill and $ per kW-year.
+
 ## Robustness (pre-listed)
 Battery sizes of 5% and 20% of peak; demand charge of 10 and 30 $/kW; RMSE instead of MAE in H1; excluding buildings with interpolated hours; a second test year split (first half vs second half of 2017).

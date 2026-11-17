@@ -1,0 +1,26 @@
+{
+ "most_accurate_is_most_valuable_open": 0.11383727223525167,
+ "most_accurate_is_most_valuable_guarded": 0.15623308677611403,
+ "chance": 0.2,
+ "spearman_bias_share_open": 0.17420545919844752,
+ "spearman_mae_share_open": -0.2897490533376974,
+ "spearman_bias_share_guarded": 0.1583755245024648,
+ "spearman_mae_share_guarded": -0.00028345966429199143,
+ "median_rel_bias": {
+  "F1": -0.0,
+  "F2": -0.0001,
+  "F3": 0.0029,
+  "F4": 0.0033,
+  "F5": 0.1093
+ },
+ "median_rel_mae": {
+  "F1": 0.1312,
+  "F2": 0.1421,
+  "F3": 0.1105,
+  "F4": 0.1016,
+  "F5": 0.1414,
+  "S_noise": 0.1016,
+  "S_scale": 0.1016,
+  "S_shift": 0.1016
+ }
+}

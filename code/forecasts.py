@@ -23,7 +23,7 @@ year = (HRS.astype("datetime64[h]").astype("datetime64[Y]").astype(int) + 1970)
 month = HRS.astype("datetime64[h]").astype("datetime64[M]").astype(int)
 TR = np.where((year == 2016) & (np.arange(T) >= 168))[0]
 TE = np.where(year == 2017)[0]
-MODELS = ["F1", "F2", "F3", "F4", "F5", "S_noise", "S_shift", "S_scale"]
+MODELS = ["F1", "F2", "F3", "F4", "F5", "S_noise", "S_shift", "S_scale", "S_under", "S_ar1"]  # amendment 3 adds the last two
 
 
 def features(b):
@@ -54,6 +54,8 @@ def one(b):
     yt, f4 = y[TE], out[3].astype(np.float64)
     shift = np.concatenate([[yt[0]], yt[:-1]])  # forecast hour t with the actual of t-1 (peak predicted 1 h late)
     s_noise, s_shift, s_scale = np.empty_like(yt), np.empty_like(yt), np.empty_like(yt)
+    s_under, s_ar1 = np.empty_like(yt), np.empty_like(yt)
+    kappas = []
     for m in np.unique(month[TE]):
         k = month[TE] == m
         target = np.abs(f4[k] - yt[k]).mean()
@@ -61,18 +63,28 @@ def one(b):
         s_noise[k] = yt[k] + z * target / np.mean(np.abs(z))
         base = np.abs(shift[k] - yt[k]).mean()
         kappa = target / base if base > 0 else 0.0
+        kappas.append(kappa)
         s_shift[k] = yt[k] + kappa * (shift[k] - yt[k])
-        s_scale[k] = yt[k] * (1 + target / yt[k].mean())
-    out[5], out[6], out[7] = s_noise, s_shift, s_scale
-    return np.maximum(out, 0)
+        r = target / yt[k].mean()
+        s_scale[k] = yt[k] * (1 + r)
+        s_under[k] = np.maximum(yt[k] * (1 - r), 0)  # amendment 3: the mirror image of S_scale
+        a = np.empty(k.sum()); a[0] = rng.standard_normal()  # amendment 3: hourly AR(1) noise, rho = 0.9
+        e = rng.standard_normal(k.sum()) * np.sqrt(1 - 0.81)
+        for t in range(1, len(a)):
+            a[t] = 0.9 * a[t - 1] + e[t]
+        s_ar1[k] = yt[k] + a * target / np.mean(np.abs(a))
+    out[5], out[6], out[7], out[8], out[9] = s_noise, s_shift, s_scale, s_under, s_ar1
+    return np.maximum(out, 0), np.array(kappas)
 
 
 if __name__ == "__main__":
     NB = int(os.environ.get("SMOKE", NB))  # SMOKE=k runs the first k buildings only (pipeline check)
     with Pool(W) as pool:
         res = pool.map(one, range(NB), chunksize=4)
-    F = np.stack(res, axis=1)  # model x building x hour
-    np.savez_compressed(os.path.join(D, "forecasts.npz.part.npz"), F=F, models=np.array(MODELS), te=TE)
+    F = np.stack([r[0] for r in res], axis=1)  # model x building x hour
+    K = np.stack([r[1] for r in res])  # building x month: multiplier of the one-hour lag error in S_shift
+    np.savez_compressed(os.path.join(D, "forecasts.npz.part.npz"), F=F, models=np.array(MODELS), te=TE, shift_kappa=K)
+    print("S_shift kappa: median %.2f, IQR %.2f-%.2f" % (np.median(K), *np.percentile(K, [25, 75])))
     os.replace(os.path.join(D, "forecasts.npz.part.npz"), os.path.join(D, "forecasts.npz"))
     mae = np.abs(F - LOAD[TE][:, :NB].T[None]).mean(axis=2) / LOAD[TE][:, :NB].mean(0)[None]
     for i, m in enumerate(MODELS):
