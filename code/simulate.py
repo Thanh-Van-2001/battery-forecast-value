@@ -20,7 +20,7 @@ Z = np.load(os.path.join(D, "prep.npz"), allow_pickle=True)
 LOAD = Z["load"].astype(np.float64)
 HRS = Z["hours"]
 FZ = np.load(os.path.join(D, "forecasts.npz"), allow_pickle=True)
-F, MODELS, TE = FZ["F"].astype(np.float64), list(FZ["models"]), FZ["te"]
+F, MODELS, TE = FZ["F"], list(FZ["models"]), FZ["te"]  # float32 to halve memory (titan is shared)
 hod = HRS % 24
 dow = ((HRS // 24) + 4) % 7
 month = HRS.astype("datetime64[h]").astype("datetime64[M]").astype(int)

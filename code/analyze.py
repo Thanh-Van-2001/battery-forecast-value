@@ -14,7 +14,10 @@ D, R = sys.argv[1], sys.argv[2]
 Z = np.load(os.path.join(D, "prep.npz"), allow_pickle=True)
 LOAD, HRS, USE = Z["load"].astype(np.float64), Z["hours"], Z["use"]
 FZ = np.load(os.path.join(D, "forecasts.npz"), allow_pickle=True)
-F, MODELS, TE = FZ["F"].astype(np.float64), list(FZ["models"]), FZ["te"]
+F, MODELS, TE = FZ["F"], list(FZ["models"]), FZ["te"]
+NBF = F.shape[1]
+LOAD = LOAD[:, :NBF]
+USE = USE[:NBF]
 REAL = ["F1", "F2", "F3", "F4", "F5"]
 month = HRS.astype("datetime64[h]").astype("datetime64[M]").astype(int)[TE]
 YT = LOAD[TE].T  # building x hour
