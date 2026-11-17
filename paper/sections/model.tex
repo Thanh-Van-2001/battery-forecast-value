@@ -11,7 +11,8 @@ At midnight before day $d$, the operator chooses charging and discharging powers
 \begin{align}
 \min_{c,\delta,s,g,z}\ & \sum_{t=1}^{24} p_t g_t + \lambda z \label{eq:lp}\\
 \text{s.t.}\ & s_{t+1}=s_t+\eta c_t-\delta_t/\eta,\quad g_t=\hat L_t+c_t-\delta_t,\quad g_t\ge 0,\quad z\ge g_t, \nonumber\\
-& z\ge \bar G_{m(d)},\quad 0\le c_t,\delta_t\le P,\quad 0.1E\le s_t\le 0.9E,\quad s_1=\bar s_d,\quad s_{25}=0.5E, \nonumber
+& z\ge \bar G_{m(d)},\quad 0\le c_t,\delta_t\le P,\quad 0.1E\le s_t\le 0.9E, \nonumber\\
+& s_1=\bar s_d,\quad s_{25}=0.5E, \nonumber
 \end{align}
 where $p_t$ is the energy price, $g_t$ the grid draw, $\bar G_{m(d)}$ the highest realised grid draw so far in the month of day $d$ and $\bar s_d$ the state of charge left by the previous day. The term $\lambda z$ thus charges only for raising the month's peak, and under T2 ($\lambda=0$) the program is pure energy arbitrage. A consequence matters later: the program is indifferent to raising the grid draw anywhere up to $\max(\bar G_{m(d)},z)$, so its optimal schedules may charge until the forecast grid draw touches the month-to-date peak. The program is solved with HiGHS for every building, day, forecaster and controller.
 

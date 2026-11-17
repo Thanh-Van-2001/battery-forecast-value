@@ -18,7 +18,7 @@ The forecaster with the lowest MAE in a building-month was also the one with the
 
 The synthetic forecasts isolate the property of the error that matters (Figure~\ref{fig:syn}). At the same MAE, a uniform over-forecast kept a median share of $\res{shT1Sscale}$ under both controllers, whereas the uniform under-forecast, its mirror image, gave $\res{shT1Sunder}$ open loop and $\res{shT1GSunder}$ with the guard. Independent noise gave $\res{shT1Snoise}$ and $\res{shT1GSnoise}$, correlated noise $\res{shT1Sar1}$ and $\res{shT1GSar1}$, and the late ramp $\res{shT1Sshift}$ and $\res{shT1GSshift}$ (Friedman $p\res{synFriedP}$ for each controller). An error that makes the forecast too low at the hours the battery charges is what costs money; an error that makes it too high only keeps charge in reserve.
 
-The real forecasters show the same pattern. The 0.9-quantile model F5 was the least accurate on average and the only one with a material bias (\res{relbiasF5}\%), and it captured the largest median share under both controllers (open loop $\res{shT1F5}$, guarded $\res{shT1GF5}$). Within buildings, the rank correlation of the annual share with relative bias averaged $\res{wRhoBiasOpen}$ open loop and $\res{wRhoBiasGuard}$ with the guard, against $\res{wRhoMaeOpen}$ and $\res{wRhoMaeGuard}$ with accuracy (negative relative MAE). Removing F5 restores a weak agreement between MAE and value among the four unbiased forecasters ($\tau=\res{fourOpenMean}$, CI $\res{fourOpenLo}$ to $\res{fourOpenHi}$, open loop; $\res{fourGuardMean}$ with the guard), and replacing the MAE by an asymmetric score restores it for all five: $\tau=\res{pinOpenMean}$ (CI $\res{pinOpenLo}$ to $\res{pinOpenHi}$) for the 0.9 pinball loss and $\res{underOpenMean}$ for the mean under-forecast error open loop, and $\res{pinGuardMean}$ and $\res{underGuardMean}$ with the guard. These analyses are exploratory. The pre-registered H2, whether the error of the forecast daily peak magnitude predicts value better than the MAE, was not supported (mean per-building Spearman correlations $\res{htwoRhoPeak}$ and $\res{htwoRhoMae}$, Holm-adjusted $p=\res{holmH2}$): like the MAE, a symmetric error of the peak ignores the sign.
+The real forecasters show the same pattern. The 0.9-quantile model F5 was the least accurate on average and the only one with a material bias (\res{relbiasF5}\%), and it captured the largest median share under both controllers (open loop $\res{shT1F5}$, guarded $\res{shT1GF5}$). Within buildings, the rank correlation of the annual share with relative bias averaged $\res{wRhoBiasOpen}$ open loop and $\res{wRhoBiasGuard}$ with the guard, against $\res{wRhoMaeOpen}$ and $\res{wRhoMaeGuard}$ with accuracy (negative relative MAE). Removing F5 restores a weak agreement between MAE and value among the four unbiased forecasters ($\tau=\res{fourOpenMean}$, CI $\res{fourOpenLo}$ to $\res{fourOpenHi}$, open loop; $\res{fourGuardMean}$ with the guard), and replacing the MAE by an asymmetric score restores it for all five: $\tau=\res{pinOpenMean}$ (CI $\res{pinOpenLo}$ to $\res{pinOpenHi}$) for the 0.9 pinball loss and $\res{underOpenMean}$ for the mean under-forecast error open loop, and $\res{pinGuardMean}$ and $\res{underGuardMean}$ with the guard. These analyses are exploratory. The pre-specified H2, whether the error of the forecast daily peak magnitude predicts value better than the MAE, was not supported (mean per-building Spearman correlations $\res{htwoRhoPeak}$ and $\res{htwoRhoMae}$, Holm-adjusted $p=\res{holmH2}$): like the MAE, a symmetric error of the peak ignores the sign.
 
 \begin{figure}[t]
 \centering
@@ -54,12 +54,12 @@ Under the time-of-use tariff T2 every forecaster captured the full perfect-infor
 \centering
 \footnotesize
 \caption{Primary test (H1) under the pre-listed alternative batteries and demand charges: mean per-building Kendall $\tau$ between accuracy (negative MAE) and captured share, demand-charge tariff, corrected simulation (v2). Excluded: T1 building-months removed by the 0.5\% rule.}\label{tab:rob}
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{lrrrrr}
 \toprule
-Setting & Open loop $\tau$ & $p$ & $\tau>0$ (\%) & Guarded $\tau$ & Excluded \\
+Setting & Open $\tau$ & $p$ & $\tau>0$ (\%) & Guarded $\tau$ & Excl. \\
 \midrule
-Base: $P$ = 10\% of peak, 20 \$/kW & $\res{honeMean}$ & \res{honeP} & \res{honePos} & $\res{honebMean}$ & \res{exclTOne} \\
+Base ($P$ 10\%, 20 \$/kW) & $\res{honeMean}$ & \res{honeP} & \res{honePos} & $\res{honebMean}$ & \res{exclTOne} \\
 $P$ = 5\% of peak & $\res{robb05Mean}$ & \res{robb05P} & \res{robb05Pos} & $\res{robgb05Mean}$ & \res{robb05Excl} \\
 $P$ = 20\% of peak & $\res{robb20Mean}$ & \res{robb20P} & \res{robb20Pos} & $\res{robgb20Mean}$ & \res{robb20Excl} \\
 Demand charge 10 \$/kW & $\res{robdc10Mean}$ & \res{robdc10P} & \res{robdc10Pos} & $\res{robgdc10Mean}$ & \res{robdc10Excl} \\
