@@ -34,5 +34,10 @@ MAE, RMSE, MAPE (on hours with load > 0), error at the hour of the actual daily 
 ## Moderators (descriptive)
 Building primary use, load-factor (mean/peak), day-to-day variability, and site; regression of the best forecaster's captured share on these.
 
+## Amendment 1 (2026-11-18, code written, before any data were loaded)
+- Captured share is undefined when perfect information saves almost nothing. Building-months where the perfect-information saving is below 0.5% of the no-battery bill are excluded from share-based tests; their number is reported. Annual shares sum bills over the remaining months.
+- The executed state of charge is not carried over: each day's schedule starts and ends at 50%, and energy left above 50% after open-loop clipping is forfeited (a small penalty on poor forecasts, the same rule for all forecasters).
+- The reactive rule under T2 (no demand charge) discharges in the expensive hours and charges in the cheap hours; under T1 it also never charges above the month-to-date peak.
+
 ## Robustness (pre-listed)
 Battery sizes of 5% and 20% of peak; demand charge of 10 and 30 $/kW; RMSE instead of MAE in H1; excluding buildings with interpolated hours; a second test year split (first half vs second half of 2017).

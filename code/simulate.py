@@ -1,0 +1,138 @@
+"""Battery scheduling and monthly bills per PLAN.md.
+For each building, tariff, battery size and demand charge: daily day-ahead LP on a forecast, open-loop execution on
+the actual load, monthly bill. Benchmarks: no battery, perfect information (same LP on the actual load), reactive rule.
+Run: python simulate.py <data_dir> <out_csv> [workers] [battery_share] [demand_charge]
+"""
+import os
+import sys
+from multiprocessing import Pool
+
+import numpy as np
+from scipy.optimize import linprog
+from scipy.sparse import lil_matrix
+
+D, OUT = sys.argv[1], sys.argv[2]
+W = int(sys.argv[3]) if len(sys.argv) > 3 else 8
+SHARE = float(sys.argv[4]) if len(sys.argv) > 4 else 0.10
+DC = float(sys.argv[5]) if len(sys.argv) > 5 else 20.0
+ETA = np.sqrt(0.90)
+Z = np.load(os.path.join(D, "prep.npz"), allow_pickle=True)
+LOAD = Z["load"].astype(np.float64)
+HRS = Z["hours"]
+FZ = np.load(os.path.join(D, "forecasts.npz"), allow_pickle=True)
+F, MODELS, TE = FZ["F"].astype(np.float64), list(FZ["models"]), FZ["te"]
+hod = HRS % 24
+dow = ((HRS // 24) + 4) % 7
+month = HRS.astype("datetime64[h]").astype("datetime64[M]").astype(int)
+PRICE = np.where((dow < 5) & (hod >= 12) & (hod < 18), 0.20, 0.10)
+YEAR = (HRS.astype("datetime64[h]").astype("datetime64[Y]").astype(int) + 1970)
+TR = YEAR == 2016
+
+# LP in variables x = [c(24), d(24), s(25), g(24), z(1)]; s is state of charge, g grid draw, z peak
+NV = 24 + 24 + 25 + 24 + 1
+ic, idd, isx, ig, iz = 0, 24, 48, 73, 97
+
+
+def build_lp(E, P):
+    Aeq = lil_matrix((24 + 24 + 2, NV))
+    for t in range(24):  # s[t+1] - s[t] - eta c + d/eta = 0
+        Aeq[t, isx + t + 1] = 1; Aeq[t, isx + t] = -1; Aeq[t, ic + t] = -ETA; Aeq[t, idd + t] = 1 / ETA
+    for t in range(24):  # g - c + d = L  (rhs set per day)
+        Aeq[24 + t, ig + t] = 1; Aeq[24 + t, ic + t] = -1; Aeq[24 + t, idd + t] = 1
+    Aeq[48, isx] = 1; Aeq[49, isx + 24] = 1
+    Aub = lil_matrix((24, NV))
+    for t in range(24):  # g - z <= 0
+        Aub[t, ig + t] = 1; Aub[t, iz] = -1
+    bounds = [(0, P)] * 48 + [(0.1 * E, 0.9 * E)] * 25 + [(0, None)] * 24 + [(0, None)]
+    return Aeq.tocsr(), Aub.tocsr(), bounds
+
+
+def schedule(Lhat, price, peak_so_far, lam, lp, E):
+    Aeq, Aub, bounds = lp
+    beq = np.concatenate([np.zeros(24), Lhat, [0.5 * E, 0.5 * E]])
+    c = np.zeros(NV); c[ig:ig + 24] = price; c[iz] = lam
+    bnd = list(bounds); bnd[iz] = (peak_so_far, None)  # demand cost lam*(z - peak) up to a constant
+    r = linprog(c, A_ub=Aub, b_ub=np.zeros(24), A_eq=Aeq, b_eq=beq, bounds=bnd, method="highs")
+    if r.status != 0:
+        return np.zeros(24), np.zeros(24), False
+    return r.x[ic:ic + 24], r.x[idd:idd + 24], True
+
+
+def execute(L, c, d, E):
+    """open loop: scheduled powers, clipped so that SoC stays in bounds and there is no export"""
+    s, g = 0.5 * E, np.empty(24)
+    for t in range(24):
+        ct = min(c[t], max(0.0, (0.9 * E - s) / ETA))
+        dt = min(d[t], max(0.0, (s - 0.1 * E) * ETA), L[t] + ct)
+        s += ETA * ct - dt / ETA
+        g[t] = L[t] + ct - dt
+    return g
+
+
+def reactive(L, price, peak_so_far, lam, E, P):
+    s, g, pk = 0.5 * E, np.empty(24), peak_so_far
+    for t in range(24):
+        if lam > 0 and L[t] > pk:  # shave above the month-to-date peak
+            dt = min(P, L[t] - pk, max(0.0, (s - 0.1 * E) * ETA)); ct = 0.0
+        elif lam == 0 and price[t] >= 0.2:  # TOU only: discharge in expensive hours
+            dt = min(P, L[t], max(0.0, (s - 0.1 * E) * ETA)); ct = 0.0
+        elif price[t] < 0.2:  # charge in cheap hours without creating a new peak
+            room = max(0.0, (0.9 * E - s) / ETA)
+            cap = P if lam == 0 else max(0.0, pk - L[t])
+            ct, dt = min(P, room, cap), 0.0
+        else:
+            ct = dt = 0.0
+        s += ETA * ct - dt / ETA
+        g[t] = L[t] + ct - dt
+        pk = max(pk, g[t])
+    return g
+
+
+def one(b):
+    L = LOAD[:, b]
+    P = SHARE * L[TR].max()
+    E = 2 * P
+    lp = build_lp(E, P)
+    rows = []
+    for lam, tariff in ((DC, "T1"), (0.0, "T2")):
+        names = ["none", "PI", "reactive"] + MODELS
+        G = {n: np.empty(len(TE)) for n in names}
+        peaks = {n: 0.0 for n in names}
+        fails = 0
+        cur_m = None
+        for k0 in range(0, len(TE), 24):
+            h = TE[k0:k0 + 24]
+            m = month[h[0]]
+            if m != cur_m:
+                peaks = {n: 0.0 for n in names}; cur_m = m
+            Ld, pr = L[h], PRICE[h]
+            G["none"][k0:k0 + 24] = Ld
+            c, d, ok = schedule(Ld, pr, peaks["PI"], lam, lp, E); fails += not ok
+            G["PI"][k0:k0 + 24] = execute(Ld, c, d, E)
+            G["reactive"][k0:k0 + 24] = reactive(Ld, pr, peaks["reactive"], lam, E, P)
+            for i, mname in enumerate(MODELS):
+                c, d, ok = schedule(F[i, b, k0:k0 + 24], pr, peaks[mname], lam, lp, E); fails += not ok
+                G[mname][k0:k0 + 24] = execute(Ld, c, d, E)
+            for n in names:
+                peaks[n] = max(peaks[n], G[n][k0:k0 + 24].max())
+        mt = month[TE]
+        for m in np.unique(mt):
+            k = mt == m
+            for n in names:
+                g = G[n][k]
+                bill = float((PRICE[TE][k] * g).sum() + lam * g.max())
+                rows.append((b, tariff, int(m), n, bill, fails))
+    return rows
+
+
+if __name__ == "__main__":
+    NB = F.shape[1]  # equals the number of buildings forecast (fewer in a SMOKE run)
+    with Pool(W) as pool:
+        res = pool.map(one, range(NB), chunksize=2)
+    with open(OUT + ".part", "w") as fh:
+        fh.write("building,tariff,month,policy,bill,lp_fail_building\n")
+        for rows in res:
+            for r in rows:
+                fh.write(",".join(map(str, r)) + "\n")
+    os.replace(OUT + ".part", OUT)
+    print("written", OUT)
