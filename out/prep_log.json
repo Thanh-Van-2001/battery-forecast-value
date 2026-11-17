@@ -1,0 +1,13 @@
+{
+ "meters": 1578,
+ "excluded": {
+  "missing>5%": 595,
+  "flat>=72h": 207,
+  "gap>24h": 269,
+  "mean<10": 45
+ },
+ "filled_share_median": 0.0009404924760601915,
+ "buildings_with_seasonal_fill": 274,
+ "kept": 462,
+ "temp_missing_after_fill": 0
+}
