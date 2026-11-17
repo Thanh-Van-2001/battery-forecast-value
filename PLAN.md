@@ -39,5 +39,10 @@ Building primary use, load-factor (mean/peak), day-to-day variability, and site;
 - The executed state of charge is not carried over: each day's schedule starts and ends at 50%, and energy left above 50% after open-loop clipping is forfeited (a small penalty on poor forecasts, the same rule for all forecasters).
 - The reactive rule under T2 (no demand charge) discharges in the expensive hours and charges in the cheap hours; under T1 it also never charges above the month-to-date peak.
 
+## Amendment 2 (2026-11-18, after a 6-building pipeline check, before the full run)
+Disclosure: the pipeline was first run on the first 6 eligible buildings to check the code (outputs kept in `smoke/`). Its outcomes were seen: under T1 every forecaster, executed open loop, captured a negative share of the perfect-information saving, the reactive rule a positive one, and among the same-MAE synthetic forecasts the 1-hour shift was worst and the 5% scale error best. Two changes follow; the hypotheses H1-H4 and their tests are unchanged and are reported on the open-loop controller as registered.
+- **Gap rule.** The 3-hour rule kept only 188 of 1,578 meters (543 excluded for one longer gap), far below the intended population. Gaps of 4-24 hours are now filled with the load at the same hour one week earlier (or later); meters with a gap above 24 hours, or more than 5% missing hours in a year, are still excluded. The pre-listed robustness check without such buildings is reported.
+- **Guarded execution (secondary).** Open-loop execution ignores the realised load, which no operator does. A second controller uses the same day-ahead schedule but never charges above the month-to-date realised peak and discharges to hold the realised load at that peak when it is exceeded. H1 and H4 are repeated for it (H1b, H4b) and the synthetic error types are compared under it. These are secondary analyses, labelled as added after the pipeline check.
+
 ## Robustness (pre-listed)
 Battery sizes of 5% and 20% of peak; demand charge of 10 and 30 $/kW; RMSE instead of MAE in H1; excluding buildings with interpolated hours; a second test year split (first half vs second half of 2017).

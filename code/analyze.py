@@ -50,18 +50,22 @@ def shares(path):
     P = B.pivot_table(index=["building", "tariff", "month"], columns="policy", values="bill")
     gain = P["none"] - P["PI"]
     ok = gain >= MIN_GAIN * P["none"]
-    S = {}
-    for pol in ["PI", "reactive"] + MODELS:
+    pols = ["reactive"] + [c for c in P.columns if c in MODELS or c.startswith("G_")]
+    S = {"PI": (P["none"] - P["PI"]) / gain}
+    for pol in pols:
         S[pol] = (P["none"] - P[pol]) / gain
     S = pd.DataFrame(S)[ok]
     ann = P[ok].groupby(level=["building", "tariff"]).sum()
-    A = pd.DataFrame({pol: (ann["none"] - ann[pol]) / (ann["none"] - ann["PI"]) for pol in ["reactive"] + MODELS})
+    A = pd.DataFrame({pol: (ann["none"] - ann[pol]) / (ann["none"] - ann["PI"]) for pol in pols})
     return S.reset_index(), A.reset_index(), int((~ok).sum()), int(len(ok))
 
 
-def h1(S, tariff, metric="mae"):
-    """mean over months of Kendall tau(-metric, captured share) across F1-F5, per building"""
-    s = S[S.tariff == tariff].melt(id_vars=["building", "tariff", "month"], value_vars=REAL, var_name="model", value_name="share")
+def h1(S, tariff, metric="mae", prefix=""):
+    """mean over months of Kendall tau(-metric, captured share) across F1-F5, per building
+    (prefix "G_" = guarded execution of the same forecasts, amendment 2)"""
+    s = S[S.tariff == tariff].melt(id_vars=["building", "tariff", "month"], value_vars=[prefix + r for r in REAL],
+                                   var_name="model", value_name="share")
+    s["model"] = s.model.str.replace(prefix, "", regex=False) if prefix else s.model
     m = s.merge(ACC[ACC.model.isin(REAL)], on=["model", "month", "building"])
     taus = m.groupby(["building", "month"]).apply(lambda g: stats.kendalltau(-g[metric], g["share"]).statistic, include_groups=False)
     return taus.groupby(level="building").mean().dropna()
@@ -91,6 +95,8 @@ for path in sorted(glob.glob(os.path.join(R, "bills_*.csv"))):
     res["H1_tau_T1"] = summary(t1)
     if tag == "base":
         res["H1_tau_T1_rmse"] = summary(h1(S, "T1", "rmse"))
+        sf = Z["seasonal_fill"][:NBF] if "seasonal_fill" in Z.files else np.zeros(NBF, bool)
+        res["H1_tau_T1_no_seasonal_fill"] = summary(t1[~sf[t1.index.values]])
         rm, rp = rho_metric(S, "T1", "mae"), rho_metric(S, "T1", "peak_mag_err")
         j = rm.index.intersection(rp.index)
         w2 = stats.wilcoxon(rp[j], rm[j])
@@ -111,7 +117,20 @@ for path in sorted(glob.glob(os.path.join(R, "bills_*.csv"))):
         res["holm"] = adj
         for tf in ("T1", "T2"):
             a = A[A.tariff == tf]
-            res[f"annual_share_{tf}"] = {p: dict(median=float(a[p].median()), mean=float(a[p].mean())) for p in ["reactive"] + MODELS}
+            res[f"annual_share_{tf}"] = {p: dict(median=float(a[p].median()), mean=float(a[p].mean()),
+                                                 share_negative=float((a[p] < 0).mean())) for p in A.columns if p not in ("building", "tariff")}
+        # amendment 2 secondary: guarded execution
+        g1 = h1(S, "T1", prefix="G_")
+        res["H1b_guarded_tau_T1"] = summary(g1)
+        ag = A[A.tariff == "T1"].set_index("building")
+        bestg = ag[["G_" + r for r in REAL]].max(axis=1)
+        kg = int((ag["reactive"] >= bestg).sum())
+        res["H4b_guarded"] = dict(share_reactive_ge_best_guarded=float(kg / len(ag)), n=int(len(ag)),
+                                  p=float(stats.binomtest(kg, len(ag), 0.5).pvalue),
+                                  median_best_guarded=float(bestg.median()), median_reactive=float(ag["reactive"].median()))
+        syng = ag[["G_S_noise", "G_S_shift", "G_S_scale"]]
+        res["synthetic_T1_guarded"] = dict(median={c: float(syng[c].median()) for c in syng},
+                                           friedman_p=float(stats.friedmanchisquare(*[syng[c] for c in syng]).pvalue))
         syn = A[A.tariff == "T1"].set_index("building")[["S_noise", "S_shift", "S_scale"]]
         res["synthetic_T1"] = dict(median={c: float(syn[c].median()) for c in syn},
                                    friedman_p=float(stats.friedmanchisquare(*[syn[c] for c in syn]).pvalue))

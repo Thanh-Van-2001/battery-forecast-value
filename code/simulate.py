@@ -69,6 +69,25 @@ def execute(L, c, d, E):
     return g
 
 
+def execute_guarded(L, c, d, E, P, peak_so_far, lam):
+    """amendment 2: the day-ahead schedule, but never charge above the month-to-date peak and discharge to hold
+    the realised load at that peak when it is exceeded (demand-charge tariff only)"""
+    if lam == 0:
+        return execute(L, c, d, E)
+    s, g, pk = 0.5 * E, np.empty(24), peak_so_far
+    for t in range(24):
+        ct = min(c[t], max(0.0, (0.9 * E - s) / ETA))
+        dt = min(d[t], max(0.0, (s - 0.1 * E) * ETA), L[t] + ct)
+        if L[t] + ct - dt > pk:
+            ct = max(0.0, min(ct, pk - L[t] + dt))
+            if L[t] + ct - dt > pk:
+                dt = min(P, max(0.0, (s - 0.1 * E) * ETA), max(dt, L[t] + ct - pk))
+        s += ETA * ct - dt / ETA
+        g[t] = L[t] + ct - dt
+        pk = max(pk, g[t])
+    return g
+
+
 def reactive(L, price, peak_so_far, lam, E, P):
     s, g, pk = 0.5 * E, np.empty(24), peak_so_far
     for t in range(24):
@@ -95,7 +114,7 @@ def one(b):
     lp = build_lp(E, P)
     rows = []
     for lam, tariff in ((DC, "T1"), (0.0, "T2")):
-        names = ["none", "PI", "reactive"] + MODELS
+        names = ["none", "PI", "reactive"] + MODELS + ["G_" + m for m in MODELS]
         G = {n: np.empty(len(TE)) for n in names}
         peaks = {n: 0.0 for n in names}
         fails = 0
@@ -113,6 +132,9 @@ def one(b):
             for i, mname in enumerate(MODELS):
                 c, d, ok = schedule(F[i, b, k0:k0 + 24], pr, peaks[mname], lam, lp, E); fails += not ok
                 G[mname][k0:k0 + 24] = execute(Ld, c, d, E)
+                if lam > 0:  # guarded execution re-plans with its own month-to-date peak
+                    c, d, ok = schedule(F[i, b, k0:k0 + 24], pr, peaks["G_" + mname], lam, lp, E); fails += not ok
+                G["G_" + mname][k0:k0 + 24] = execute_guarded(Ld, c, d, E, P, peaks["G_" + mname], lam)
             for n in names:
                 peaks[n] = max(peaks[n], G[n][k0:k0 + 24].max())
         mt = month[TE]

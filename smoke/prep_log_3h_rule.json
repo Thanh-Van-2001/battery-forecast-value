@@ -1,0 +1,11 @@
+{
+ "meters": 1578,
+ "excluded": {
+  "missing>5%": 595,
+  "flat>=72h": 207,
+  "gap>3h": 543,
+  "mean<10": 45
+ },
+ "kept": 188,
+ "temp_missing_after_fill": 0
+}

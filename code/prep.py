@@ -15,7 +15,7 @@ wx = pd.read_csv(os.path.join(D, "weather.csv"), parse_dates=["timestamp"])
 idx = pd.date_range("2016-01-01 00:00", "2017-12-31 23:00", freq="h")
 el = el.reindex(idx)
 LOG = {"meters": el.shape[1]}
-keep, why = [], {}
+keep, why, maxgap = [], {}, {}
 for b in el.columns:
     x = el[b]
     ok = True
@@ -37,12 +37,21 @@ for b in el.columns:
     if np.nanmean(v) < 10:
         why["mean<10"] = why.get("mean<10", 0) + 1; continue
     gaps = x.isna().astype(int).groupby(x.notna().cumsum()).sum()
-    if gaps.max() > 3:
-        why["gap>3h"] = why.get("gap>3h", 0) + 1; continue
+    if gaps.max() > 24:  # amendment 2: gaps of 4-24 h are filled from the same hour a week earlier
+        why["gap>24h"] = why.get("gap>24h", 0) + 1; continue
     keep.append(b)
+    maxgap[b] = int(gaps.max())
 LOG["excluded"] = why
-L = el[keep].interpolate(limit=3, limit_area="inside").bfill(limit=3).ffill(limit=3)
+raw = el[keep]
+L = raw.interpolate(limit=3, limit_area="inside")
+for _ in range(4):  # seasonal fill for longer gaps: same hour one week earlier (then later), repeated if needed
+    L = L.fillna(L.shift(168)).fillna(L.shift(-168))
+L = L.bfill(limit=3).ffill(limit=3)
 assert not L.isna().any().any(), "residual missing values"
+filled = raw.isna() & L.notna()
+LOG["filled_share_median"] = float(filled.mean().median())
+LOG["buildings_with_seasonal_fill"] = int(sum(v > 3 for v in maxgap.values()))
+seasonal = np.array([maxgap[b] > 3 for b in keep])
 site = meta.loc[keep, "site_id"].values
 temp = np.full(L.shape, np.nan)
 for s in np.unique(site):
@@ -52,6 +61,6 @@ LOG["kept"] = len(keep)
 LOG["temp_missing_after_fill"] = int(np.isnan(temp).sum())
 np.savez_compressed(os.path.join(D, "prep.npz"), load=L.values.astype(np.float32), temp=temp.astype(np.float32),
                     hours=idx.values.astype("datetime64[h]").astype(np.int64), buildings=np.array(keep),
-                    site=site, use=meta.loc[keep, "primaryspaceusage"].fillna("unknown").values)
+                    site=site, use=meta.loc[keep, "primaryspaceusage"].fillna("unknown").values, seasonal_fill=seasonal)
 json.dump(LOG, open(os.path.join(D, "prep_log.json"), "w"), indent=1)
 print(json.dumps(LOG, indent=1))
