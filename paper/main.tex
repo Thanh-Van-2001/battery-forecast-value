@@ -7,21 +7,21 @@
 \usepackage[hidelinks]{hyperref}
 \IfFileExists{xurl.sty}{\usepackage{xurl}}{}
 \setlength{\emergencystretch}{2em}
+\biboptions{sort&compress}
 \input{gen/macros.tex}
-\newcommand{\repoURL}{https://github.com/Thanh-Van-2001/battery-forecast-value}
 \ifdefined\ANON
 \newcommand{\repolink}{a repository whose address is given on the title page (withheld for anonymized review)}
 \else
-\newcommand{\repolink}{\url{\repoURL}}
+\newcommand{\repolink}{\url{https://github.com/Thanh-Van-2001/battery-forecast-value}}
 \fi
 
-\journal{Applied Energy}
+\journal{Energy and Buildings}
 
 \begin{document}
 
 \begin{frontmatter}
 
-\title{Asymmetric errors, not accuracy, decide what a load forecast is worth for battery peak shaving: a pre-specified study of \res{nKept} buildings}
+\title{The most accurate load forecast is not the most valuable: a pre-specified study of battery peak shaving under demand charges in \res{nKept} buildings}
 
 % main_anon.tex defines \ANON and inputs this file: the anonymized review copy.
 \ifdefined\ANON\else
@@ -38,7 +38,7 @@
 \end{abstract}
 
 \begin{keyword}
-Load forecasting \sep Battery energy storage \sep Demand charge \sep Peak shaving \sep Forecast evaluation \sep Decision-focused learning
+Load forecasting \sep Battery energy storage \sep Demand charge \sep Peak shaving \sep Forecast value \sep Quantile forecasting \sep Non-residential buildings
 \end{keyword}
 
 \end{frontmatter}
@@ -48,6 +48,7 @@ Load forecasting \sep Battery energy storage \sep Demand charge \sep Peak shavin
 \input{sections/model}
 \input{sections/design}
 \input{sections/results}
+\input{sections/exploratory}
 \input{sections/discussion}
 \input{sections/conclusion}
 \input{sections/declarations}

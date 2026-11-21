@@ -1,5 +1,5 @@
 Five load forecasters ranked by accuracy and by bill savings in 462 buildings
 Under demand charges, ranking by MAE did not agree with ranking by savings
 Under-forecasts set new peaks; over-forecasts of equal size cost little
-A 0.9-quantile forecaster, least accurate on average, saved the most
+A 0.9-quantile forecaster, least accurate on average, captured most value
 A real-time peak guard mattered more than the choice of forecaster

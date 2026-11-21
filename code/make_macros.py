@@ -136,6 +136,88 @@ for m in rk.columns:
 S3 = json.load(open(os.path.join(ROOT, "smoke", "prep_log_3h_rule.json")))
 M["nKeptThreeH"] = S3["kept"]; M["nExclThreeH"] = S3["excluded"]["gap>3h"]
 
+# ---------------------------------------------------------------- post-submission exploratory analyses (prefix rv)
+# out_revision/revision.json, written by code/revision_analyze.py from the titan runs of revision_explore.py and
+# revision_tsfm.py. Not pre-specified; reported in the section "Exploratory analyses added after the pre-specified study".
+RVF = os.path.join(ROOT, "out_revision", "revision.json")
+if os.path.exists(RVF):
+    V = json.load(open(RVF))
+    NAME = {"F1": "Fone", "F2": "Ftwo", "F3": "Fthree", "F4": "Ffour", "F5": "Ffive", "Q50": "Qfifty", "Q70": "Qseventy",
+            "Q80": "Qeighty", "Q90": "Qninety", "Q95": "Qninetyfive", "B50": "Bfifty", "B90": "Bninety"}
+
+    def rv_tau(tag, s):
+        M["rv" + tag] = f"{s['mean']:.3f}"; M["rv" + tag + "Lo"] = f"{s['ci'][0]:.3f}"
+        M["rv" + tag + "Hi"] = f"{s['ci'][1]:.3f}"; M["rv" + tag + "Pos"] = pc(s["share_pos"]); M["rv" + tag + "P"] = pv(s["p"])
+
+    def rv_annual(prefix, a):
+        """median annual share (and IQR), % of buildings with a higher bill, saving in % of bill and $/kW-yr"""
+        M[prefix + "Sh"] = f"{a['median']:.2f}"; M[prefix + "Up"] = pc(a["share_buildings_bill_up"])
+        M[prefix + "Pct"] = f"{a['pct_of_bill_median']:.2f}"; M[prefix + "Usd"] = f"{a['usd_per_kw_yr_median']:.0f}"
+        if "q25" in a:
+            M[prefix + "ShLo"] = f"{a['q25']:.2f}"; M[prefix + "ShHi"] = f"{a['q75']:.2f}"
+
+    # reproduction checks of the new code against the submitted run
+    chk = max(V[k] for k in ("check_max_abs_diff_PI", "check_max_abs_diff_none", "check_max_abs_diff_F5_vs_Q90",
+                             "check_max_abs_diff_GF5_vs_GQ90"))
+    M["rvCheckMaxDiff"] = f"{chk:.1f}"; M["rvCheckHone"] = f"{V['check_H1_open_reproduced']['mean']:.3f}"
+    M["rvLpFail"] = V["lp_failures"] + V.get("lp_failures_tsfm", 0) + V["hindsight_failures"]
+    # R1 monthly hindsight benchmark
+    h1, h2 = V["R1_hindsight"]["T1"], V["R1_hindsight"]["T2"]
+    M["rvHindCapt"] = pc(h1["daily_PI_share_of_hindsight_saving_median"], 1)
+    M["rvHindCaptLo"] = pc(h1["daily_PI_share_q25"], 1); M["rvHindCaptHi"] = pc(h1["daily_PI_share_q75"], 1)
+    M["rvHindCaptTtwo"] = pc(h2["daily_PI_share_of_hindsight_saving_median"], 0)
+    M["rvHindPct"] = f"{h1['hindsight_saving_pct_of_bill_median']:.2f}"
+    M["rvHindDailyPct"] = f"{h1['daily_PI_saving_pct_of_bill_median']:.2f}"
+    hs = h1["annual_share_of_hindsight_median"]
+    for pol, v in hs.items():
+        M["rvHindSh" + pol.replace("_", "")] = f"{v:.2f}"
+    pols = ["reactive"] + [m for m in ("F1", "F2", "F3", "F4", "F5")] + ["G_" + m for m in ("F1", "F2", "F3", "F4", "F5")]
+    M["rvHindMaxDiff"] = f"{max(abs(hs[p] - b['annual_share_T1'][p]['median']) for p in pols):.2f}"
+    # R2 headroom margin in the day-ahead program
+    for mm, tag in (("H05", "Hfive"), ("H10", "Hten")):
+        r = V["R2_headroom"][mm]
+        rv_tau(tag + "Open", r["H1_open"]); rv_tau(tag + "Guard", r["H1_guarded"])
+        rv_tau(tag + "Pin", r["H1_open_pinball"]); rv_tau(tag + "Four", r["H1_open_F1toF4"])
+        for f in ("F1", "F2", "F3", "F4", "F5"):
+            rv_annual("rv" + tag + NAME[f], r["annual"][f"{mm}_{f}"])
+            rv_annual("rv" + tag + "G" + NAME[f], r["annual"][f"G_{mm}_{f}"])
+        up = [r["annual"][f"{mm}_{f}"]["share_buildings_bill_up"] for f in ("F1", "F2", "F3", "F4")]
+        M["rv" + tag + "UpFourLo"] = pc(min(up)); M["rv" + tag + "UpFourHi"] = pc(max(up))
+        gp = [r["annual"][f"G_{mm}_{f}"]["pct_of_bill_median"] for f in ("F1", "F2", "F3", "F4", "F5")]
+        M["rv" + tag + "GPctLo"] = f"{min(gp):.2f}"; M["rv" + tag + "GPctHi"] = f"{max(gp):.2f}"
+        osh = [r["annual"][f"{mm}_{f}"]["median"] for f in ("F1", "F2", "F3", "F4")]
+        M["rv" + tag + "ShFourLo"] = f"{min(osh):.2f}"; M["rv" + tag + "ShFourHi"] = f"{max(osh):.2f}"
+    # R3 quantile sweep (LightGBM, F4/F5 features; Q90 is F5 refitted)
+    r3 = V["R3_quantiles"]
+    for f in ("F1", "F2", "F3", "F4", "Q50", "Q70", "Q80", "Q90", "Q95"):
+        M["rvRankNine" + NAME[f]] = f"{r3['mean_mae_rank_of_nine'][f]:.2f}"
+        M["rvMae" + NAME[f]] = f"{r3['median_monthly_mae_kwh'][f]:.2f}"
+        rv_annual("rvQ" + NAME[f], r3["annual"][f]); rv_annual("rvQG" + NAME[f], r3["annual"]["G_" + f])
+    for f, v in r3["median_monthly_rel_bias"].items():
+        M["rvBias" + NAME[f]] = f"{100 * v:+.1f}"
+    rv_tau("QonlyOpen", r3["H1_quantiles_only_open"]); rv_tau("QonlyGuard", r3["H1_quantiles_only_guarded"])
+    rv_tau("NineOpen", r3["H1_nine_open"]); rv_tau("NineGuard", r3["H1_nine_guarded"])
+    rv_tau("NinePin", r3["H1_nine_open_pinball"]); rv_tau("NineUnder", r3["H1_nine_open_under"])
+    # R5 within-building regression with building fixed effects, cluster-robust standard errors
+    for col, tag in (("share_open", "Open"), ("share_guarded", "Guard")):
+        r = V["R5_fe_regression"][col]
+        M["rvFeMae" + tag] = f"{r['beta_rel_mae_per_pp']:+.4f}"; M["rvFeMaeSe" + tag] = f"{r['se_rel_mae']:.4f}"
+        M["rvFeBias" + tag] = f"{r['beta_rel_bias_per_pp']:+.4f}"; M["rvFeBiasSe" + tag] = f"{r['se_rel_bias']:.4f}"
+        M["rvFeN"] = f"{r['n_obs']:,}"
+    # R6 zero-shot foundation-model forecaster (Chronos-Bolt small): B50 median, B90 0.9 quantile
+    r6 = V["R6_tsfm"]
+    rv_tau("SevenOpen", r6["H1_seven_open"]); rv_tau("SevenGuard", r6["H1_seven_guarded"])
+    rv_tau("SevenPin", r6["H1_seven_open_pinball"])
+    for f, v in r6["mean_mae_rank_of_seven"].items():
+        M["rvRankSeven" + NAME[f]] = f"{v:.2f}"
+    for f, v in r6["median_monthly_mae_kwh"].items():
+        M["rvMaeSeven" + NAME[f]] = f"{v:.2f}"
+    for f, v in r6["median_monthly_rel_bias"].items():
+        M["rvBias" + NAME[f]] = f"{100 * v:+.1f}"
+    M["rvBfiftyBeatsFfour"] = pc(r6["B50_more_accurate_than_F4_share_of_months"])
+    for f in ("B50", "B90"):
+        rv_annual("rv" + NAME[f], r6["annual"][f]); rv_annual("rvG" + NAME[f], r6["annual"]["G_" + f])
+
 os.makedirs(os.path.join(ROOT, "paper", "gen"), exist_ok=True)
 with open(os.path.join(ROOT, "paper", "gen", "macros.tex"), "w") as fh:
     fh.write("% generated by code/make_macros.py - do not edit\n\\makeatletter\n")
@@ -144,5 +226,7 @@ with open(os.path.join(ROOT, "paper", "gen", "macros.tex"), "w") as fh:
     fh.write("\\makeatother\n\\newcommand{\\res}[1]{\\ifcsname res@#1\\endcsname\\csname res@#1\\endcsname\\else\\textbf{??#1??}\\fi}\n")
 man = {f: hashlib.sha256(open(os.path.join(ROOT, "out", f), "rb").read()).hexdigest()
        for f in ["results.json", "exploratory.json", "prep_log.json", "panel.csv", "facts.json", "accuracy.csv.gz"]}
+if os.path.exists(RVF):
+    man["../out_revision/revision.json"] = hashlib.sha256(open(RVF, "rb").read()).hexdigest()
 json.dump(man, open(os.path.join(ROOT, "paper", "gen", "manifest.json"), "w"), indent=1)
 print(len(M), "macros")

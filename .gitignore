@@ -14,3 +14,11 @@ paper/*.fdb_latexmk
 paper/submission/*.aux
 paper/submission/*.log
 paper/submission/*.out
+
+# private submission notes (kept local)
+REVISION_NOTES.md
+paper/submission_eb/cover_letter.md
+paper/submission_eb/title_page.md
+paper/submission_eb/package/cover_letter.docx
+paper/submission_eb/package/title_page.docx
+paper/submission_eb/package/title_page.pdf

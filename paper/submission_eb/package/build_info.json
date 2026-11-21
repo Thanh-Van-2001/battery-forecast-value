@@ -1,0 +1,44 @@
+{
+ "manuscript_pages": 30,
+ "manuscript_anonymized_pages": 29,
+ "abstract_words": 248,
+ "keywords": [
+  "Load forecasting",
+  "Battery energy storage",
+  "Demand charge",
+  "Peak shaving",
+  "Forecast value",
+  "Quantile forecasting",
+  "Non-residential buildings"
+ ],
+ "title": "The most accurate load forecast is not the most valuable: a pre-specified study of battery peak shaving under demand charges in 462 buildings",
+ "highlights": [
+  "Pre-specified test, 462 buildings: MAE did not rank load forecasts by savings",
+  "Under-forecasts set new demand peaks; over-forecasts of the same size cost little",
+  "Open loop, the most accurate forecast raised the bill in 83% of buildings",
+  "Value rose with the forecast quantile level (0.5 to 0.95) while accuracy fell",
+  "A real-time peak guard mattered more than the choice of forecaster"
+ ],
+ "references_cited": 45,
+ "references_added_since_AE": [
+  "ansari2024chronos",
+  "ansari2025chronos2",
+  "cortesaguirre2025empc",
+  "das2024timesfm",
+  "hossen2026ptoev",
+  "katholnigg2025impact",
+  "langtry2024data",
+  "liao2025timegpt",
+  "paredes2025dflreserve",
+  "park2025tsfmbuildings",
+  "perezpineiro2026tiered",
+  "putz2023truevalue",
+  "saleptsis2026dfl",
+  "sesay2026quantile",
+  "smets2025valueprice",
+  "valle2027riskaware",
+  "woo2024moirai",
+  "zhang2025valueoriented"
+ ],
+ "cover_letter_words": 790
+}
